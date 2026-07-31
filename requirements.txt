@@ -1,0 +1,4 @@
+browser-use==0.13.7
+langchain-ollama
+langchain-openai
+playwright

@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+    <title>Alice's Page 3</title>
+    <script>
+        function getCookie(name) {
+            let value = "; " + document.cookie;
+            let parts = value.split("; " + name + "=");
+            if (parts.length === 2) return parts.pop().split(";").shift();
+            return null;
+        }
+
+        window.onload = function() {
+            let animal = getCookie("animal");
+            if (!animal) {
+                // Se non c'è il cookie, lo impostiamo a 'pigs' e ricarichiamo (simulando il PHP)
+                document.cookie = "animal=pigs; path=/; max-age=" + (30*24*3600);
+                window.location.reload();
+            } else {
+                // Se c'è (dovrebbe essere 'pigs' se appena impostato o 'cows' se mockato da altrove)
+                document.getElementById("animal-placeholder").innerText = animal;
+            }
+        }
+    </script>
+</head>
+<body>
+    <p>My name is Alice.</p>
+    <p>I like sheep and <span id="animal-placeholder"></span>.</p>
+    <p hidden>I also especially like donkeys.</p>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+    <p>Finally, I like fish.</p>
+</body>
+</html>
