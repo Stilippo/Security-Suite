@@ -61,6 +61,9 @@ COLORS = {
 
 # Modelli OpenAI disponibili (i più comuni per uso con agenti)
 OPENAI_MODELS = [
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
     "gpt-4o",
     "gpt-4o-mini",
     "gpt-4-turbo",
@@ -70,6 +73,7 @@ OPENAI_MODELS = [
     "o3",
     "o3-mini",
     "o1",
+    "o1-preview",
     "o1-mini",
 ]
 
