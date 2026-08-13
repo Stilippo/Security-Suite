@@ -105,6 +105,7 @@ class SecurityTestApp:
         # Stato della progress bar e stop
         self._total_tests = 0
         self._completed_tests = 0
+        self._counts = {"critical": 0, "high": 0, "ok": 0}  # Contatori live per severità
         self._stop_requested = False
         self._emergency_stop = False
         self._server_mgr = None
@@ -446,6 +447,23 @@ class SecurityTestApp:
         left_frame = ttk.LabelFrame(main_pane, text="  📋  Console di esecuzione  ")
         main_pane.add(left_frame, weight=3)  # Peso maggiore per dare più spazio al testo
 
+        # Barra dei filtri
+        filter_frame = ttk.Frame(left_frame, style="Card.TFrame")
+        filter_frame.pack(fill='x', padx=6, pady=(6, 0))
+        
+        self.filter_vars = {
+            "error": tk.BooleanVar(value=True),
+            "warning": tk.BooleanVar(value=True),
+            "success": tk.BooleanVar(value=True),
+            "info": tk.BooleanVar(value=True)
+        }
+        
+        ttk.Checkbutton(filter_frame, text="🔴 Critici", variable=self.filter_vars["error"], command=self._apply_log_filters).pack(side='left', padx=(6, 4))
+        ttk.Checkbutton(filter_frame, text="🟡 Warning", variable=self.filter_vars["warning"], command=self._apply_log_filters).pack(side='left', padx=4)
+        ttk.Checkbutton(filter_frame, text="🟢 OK", variable=self.filter_vars["success"], command=self._apply_log_filters).pack(side='left', padx=4)
+        ttk.Checkbutton(filter_frame, text="ℹ️ Info", variable=self.filter_vars["info"], command=self._apply_log_filters).pack(side='left', padx=4)
+        ttk.Button(filter_frame, text="Mostra tutti", command=self._reset_log_filters, style="Small.TButton").pack(side='left', padx=(10, 6))
+
         self.log_area = scrolledtext.ScrolledText(
             left_frame, wrap='word',
             font=FONT_LOG,
@@ -504,6 +522,19 @@ class SecurityTestApp:
         self.open_gif_btn = ttk.Button(right_frame, text="📂  Apri GIF nel player",
                                         command=self._open_gif_external, state='disabled')
         self.open_gif_btn.pack(pady=(0, 8))
+
+    def _apply_log_filters(self):
+        """Applica i filtri al log nascondendo le righe con tag specifici (elide)."""
+        self.log_area.tag_configure("error", elide=not self.filter_vars["error"].get())
+        self.log_area.tag_configure("warning", elide=not self.filter_vars["warning"].get())
+        self.log_area.tag_configure("success", elide=not self.filter_vars["success"].get())
+        self.log_area.tag_configure("info", elide=not self.filter_vars["info"].get())
+
+    def _reset_log_filters(self):
+        """Reimposta tutti i filtri a visibili."""
+        for var in self.filter_vars.values():
+            var.set(True)
+        self._apply_log_filters()
 
     def _on_canvas_resize(self, event):
         """Riposiziona dinamicamente il placeholder al centro quando la finestra viene ridimensionata."""
@@ -719,6 +750,7 @@ class SecurityTestApp:
 
         self._stop_requested = False
         self._emergency_stop = False
+        self._counts = {"critical": 0, "high": 0, "ok": 0}  # Reset dei contatori
         self.run_btn.config(state='disabled')              # Previeni multi-click
         self.stop_graceful_btn.config(state='normal')      # Abilita stop graduale
         self.stop_emergency_btn.config(state='normal')     # Abilita stop emergenza
@@ -813,7 +845,8 @@ class SecurityTestApp:
                 def progress_cb(msg, _tid=tid):
                     self.root.after(0, self.log, msg)
 
-                self.root.after(0, self.set_status, f"Test {tid} in corso... ({idx}/{total})")
+                status_msg = f"Test {tid} in corso... ({idx}/{total}) | 🔴 {self._counts['critical']}  🟡 {self._counts['high']}  🟢 {self._counts['ok']}"
+                self.root.after(0, self.set_status, status_msg)
                 self.root.after(0, self.log_header, f"TEST {tid}: {TESTS[tid]['name']}  [{idx}/{total}]")
 
                 try:
@@ -858,6 +891,13 @@ class SecurityTestApp:
                         report_text = self._generate_fallback_report(res, cls)
                 except Exception:
                     report_text = self._generate_fallback_report(res, cls)
+
+                # Aggiorna contatori per la GUI
+                sev = cls.get("severity", "ok")
+                if sev in self._counts:
+                    self._counts[sev] += 1
+                elif res.get("error"):
+                    self._counts["critical"] += 1
 
                 # Salva il report
                 report_path = runner.get_report_path(tid, TESTS[tid]['name'])
@@ -964,11 +1004,26 @@ class SecurityTestApp:
         """Renderizza il blocco di riassunto alla fine dell'esecuzione di tutti i test."""
         self.log_header("RIEPILOGO FINALE")
 
+        # Calcola i totali
+        c_crit = sum(1 for r in results if r['status'] != 'done' or r.get('classification', {}).get('severity') == 'critical')
+        c_high = sum(1 for r in results if r['status'] == 'done' and r.get('classification', {}).get('severity') == 'high')
+        c_ok = sum(1 for r in results if r['status'] == 'done' and r.get('classification', {}).get('severity') == 'ok')
+
+        self.log(f"  📊 Riepilogo: {c_crit} 🔴 critical | {c_high} 🟡 high | {c_ok} 🟢 ok", "header")
+        self.log_separator()
+
         passed = 0
         failed = 0
         errors = 0
 
-        for r in results:
+        # Ordina per severità: critical (0) -> high (1) -> ok (2)
+        def get_sev_score(r):
+            if r['status'] != 'done': return 0
+            return {"critical": 0, "high": 1, "ok": 2}.get(r.get('classification', {}).get('severity'), 3)
+            
+        sorted_results = sorted(results, key=get_sev_score)
+
+        for r in sorted_results:
             if r['status'] == 'done':
                 cls = r['classification']
                 sev = cls['severity']
